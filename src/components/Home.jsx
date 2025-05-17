@@ -1,50 +1,49 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { axiosPrivate } from '../api/axios';
 import '../styles/Home.css';
 
 const Home = () => {
   const navigate = useNavigate();
+  const [games, setGames] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Sample data for featured games
-  const featuredGames = [
-    {
-      id: 1,
-      name: "Catan",
-      image: "https://images.unsplash.com/photo-1610890716171-6b1bb98ffd09?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=60",
-      rating: 4.8,
-      reviews: 1250,
-      category: "Strategy"
-    },
-    {
-      id: 2,
-      name: "Ticket to Ride",
-      image: "https://images.unsplash.com/photo-1611996575749-79a3a250f948?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=60",
-      rating: 4.7,
-      reviews: 980,
-      category: "Family"
-    },
-    {
-      id: 3,
-      name: "Pandemic",
-      image: "https://images.unsplash.com/photo-1611996575749-79a3a250f948?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=60",
-      rating: 4.6,
-      reviews: 850,
-      category: "Cooperative"
-    }
-  ];
+  useEffect(() => {
+    const fetchGames = async () => {
+      try {
+        const response = await axiosPrivate.get('/game/getGames');
+        const gamesData = Array.isArray(response.data) ? response.data : Object.values(response.data);
+        console.log(gamesData[0]);
+        setGames(gamesData[0]);
+        setLoading(false);
+      } catch (err) {
+        setError('Failed to fetch games');
+        setLoading(false);
+        console.error('Error fetching games:', err);
+      }
+    };
 
-  const categories = [
-    { name: "Strategy", icon: "🎯" },
-    { name: "Family", icon: "👨‍👩‍👧‍👦" },
-    { name: "Party", icon: "🎉" },
-    { name: "Cooperative", icon: "🤝" },
-    { name: "Card Games", icon: "🃏" },
-    { name: "RPG", icon: "⚔️" }
-  ];
+    fetchGames();
+  }, []);
 
   const handleGameClick = (gameName) => {
-    navigate(`/game/${gameName.toLowerCase().replace(/\s+/g, '-')}`);
+    // Convert game name to URL-friendly format
+    const urlFriendlyName = gameName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-') // Replace any non-alphanumeric characters with hyphens
+      .replace(/^-+|-+$/g, ''); // Remove leading and trailing hyphens
+    
+    navigate(`/game/${urlFriendlyName}`);
   };
+
+  if (loading) {
+    return <div className="loading">Loading games...</div>;
+  }
+
+  if (error) {
+    return <div className="error">{error}</div>;
+  }
 
   return (
     <div className="home">
@@ -54,47 +53,52 @@ const Home = () => {
         <p>Find, review, and share your board game experiences</p>
       </section>
 
-      {/* Categories Section */}
-      <section className="categories">
-        <h2>Browse by Category</h2>
-        <div className="category-grid">
-          {categories.map((category, index) => (
-            <div key={index} className="category-card">
-              <span className="category-icon">{category.icon}</span>
-              <h3>{category.name}</h3>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Featured Games Section */}
+      {/* Games Grid Section */}
       <section className="featured-games">
         <h2>Featured Board Games</h2>
         <div className="games-grid">
-          {featuredGames.map((game) => (
+          {games.map((game) => (
             <div 
-              key={game.id} 
+              key={game?.game_id || Math.random()} 
               className="game-card"
-              onClick={() => handleGameClick(game.name)}
+              onClick={() => handleGameClick(game?.game_name)}
               role="button"
               tabIndex={0}
               onKeyPress={(e) => {
                 if (e.key === 'Enter') {
-                  handleGameClick(game.name);
+                  handleGameClick(game?.game_name);
                 }
               }}
             >
               <div className="game-image">
-                <img src={game.image} alt={game.name} />
-                <span className="game-category">{game.category}</span>
+                <img 
+                  src={game?.image_url || 'https://via.placeholder.com/150'} 
+                  alt={game?.game_name || 'Game'} 
+                />
               </div>
               <div className="game-info">
-                <h3>{game.name}</h3>
-                <div className="game-rating">
-                  <span className="stars">{"★".repeat(Math.floor(game.rating))}</span>
-                  <span className="rating-number">{game.rating}</span>
-                  <span className="reviews">({game.reviews} reviews)</span>
+                <h3>{game?.game_name || 'Unnamed Game'}</h3>
+                <div className="game-details">
+                  <span className="game-year">{game?.game_year || 'N/A'}</span>
+                  <span className="game-players">
+                    {game?.game_minplayers || '?'}-{game?.game_maxplayers || '?'} players
+                  </span>
                 </div>
+                <div className="game-rating">
+                  <span className="stars">
+                    {"★".repeat(Math.floor(parseFloat(game?.popularity_score || 0)))}
+                  </span>
+                  <span className="rating-number">
+                    {parseFloat(game?.popularity_score || 0).toFixed(1)}
+                  </span>
+                </div>
+                {game?.game_description && (
+                  <p className="game-description">
+                    {game.game_description.length > 100 
+                      ? `${game.game_description.substring(0, 100)}...` 
+                      : game.game_description}
+                  </p>
+                )}
               </div>
             </div>
           ))}
