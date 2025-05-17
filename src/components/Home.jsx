@@ -37,6 +37,32 @@ const Home = () => {
     navigate(`/game/${urlFriendlyName}`);
   };
 
+  const renderStars = (rating) => {
+    if (!rating) return null;
+    
+    const stars = [];
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating % 1 >= 0.5;
+
+    // Add full stars
+    for (let i = 0; i < fullStars; i++) {
+      stars.push("★");
+    }
+
+    // Add half star if needed
+    if (hasHalfStar) {
+      stars.push("★");
+    }
+
+    // Add empty stars
+    const emptyStars = 5 - stars.length;
+    for (let i = 0; i < emptyStars; i++) {
+      stars.push("☆");
+    }
+
+    return <span className="stars">{stars.join("")}</span>;
+  };
+
   if (loading) {
     return <div className="loading">Loading games...</div>;
   }
@@ -78,19 +104,31 @@ const Home = () => {
               </div>
               <div className="game-info">
                 <h3>{game?.game_name || 'Unnamed Game'}</h3>
-                <div className="game-details">
-                  <span className="game-year">{game?.game_year || 'N/A'}</span>
-                  <span className="game-players">
-                    {game?.game_minplayers || '?'}-{game?.game_maxplayers || '?'} players
-                  </span>
+                <div className="game-meta">
+                  <div className="game-details">
+                    <span className="game-year">{game?.game_year || 'N/A'}</span>
+                    <span className="game-players">
+                      {game?.game_minplayers || '?'}-{game?.game_maxplayers || '?'} players
+                    </span>
+                  </div>
                 </div>
                 <div className="game-rating">
-                  <span className="stars">
-                    {"★".repeat(Math.floor(parseFloat(game?.popularity_score || 0)))}
-                  </span>
-                  <span className="rating-number">
-                    {parseFloat(game?.popularity_score || 0).toFixed(1)}
-                  </span>
+                  {game?.popularity_score && game?.review_count > 0 ? (
+                    <>
+                      <span className="stars">
+                        {console.log('Average rating:', game.popularity_score)}
+                        {renderStars(game.popularity_score)}
+                      </span>
+                      <span className="rating-number">
+                        {parseFloat(game.popularity_score).toFixed(1)}
+                      </span>
+                      <span className="review-count">
+                        ({game.review_count} {game.review_count === 1 ? 'rating' : 'ratings'})
+                      </span>
+                    </>
+                  ) : (
+                    <span className="no-rating">No ratings yet</span>
+                  )}
                 </div>
                 {game?.game_description && (
                   <p className="game-description">

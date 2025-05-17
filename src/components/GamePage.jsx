@@ -6,18 +6,58 @@ import '../styles/GamePage.css';
 const GamePage = () => {
   const { gameName } = useParams();
   const [game, setGame] = useState(null);
+  const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [reviewsLoading, setReviewsLoading] = useState(true);
+  const [reviewsError, setReviewsError] = useState(null);
+  const [averageRating, setAverageRating] = useState(0);
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [editingReview, setEditingReview] = useState(null);
+  const [reviewForm, setReviewForm] = useState({
+    username: '',
+    stars: 5,
+    comment: ''
+  });
+  const [formError, setFormError] = useState(null);
+  const [formSuccess, setFormSuccess] = useState(null);
+
+  const fetchReviews = async (gameId) => {
+    try {
+      const response = await axiosPrivate.get(`/review/getReviews/${gameId}`);
+      console.log('Reviews response:', response.data);
+      const reviewsData = response.data.result || response.data;
+      const reviewsArray = Array.isArray(reviewsData) ? reviewsData : [reviewsData];
+      setReviews(reviewsArray);
+      
+      // Calculate average rating
+      if (reviewsArray.length > 0) {
+        const totalRating = reviewsArray.reduce((sum, review) => sum + review.stars, 0);
+        const avgRating = totalRating / reviewsArray.length;
+        setAverageRating(avgRating);
+      }
+      
+      setReviewsLoading(false);
+    } catch (err) {
+      setReviewsError('Failed to fetch reviews');
+      setReviewsLoading(false);
+      console.error('Error fetching reviews:', err);
+    }
+  };
 
   useEffect(() => {
     const fetchGame = async () => {
       try {
         const response = await axiosPrivate.get(`/game/getGame/${gameName}`);
-        console.log('Response:', response.data);
         // Handle the nested object structure
         const gameData = response.data.result || response.data;
         setGame(gameData);
         setLoading(false);
+        
+        // Fetch reviews after getting game data
+        if (gameData.game_id) {
+          fetchReviews(gameData.game_id);
+        }
       } catch (err) {
         setError('Failed to fetch game details');
         setLoading(false);
@@ -27,6 +67,124 @@ const GamePage = () => {
 
     fetchGame();
   }, [gameName]);
+
+  const renderStars = (rating) => {
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating % 1 >= 0.5;
+    const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
+
+    return (
+      <>
+        {"★".repeat(fullStars)}
+        {hasHalfStar && "★"}
+        {"☆".repeat(emptyStars)}
+      </>
+    );
+  };
+
+  const handleEditReview = (review) => {
+    setEditingReview(review);
+    setReviewForm({
+      username: review.username,
+      stars: review.stars,
+      comment: review.comment
+    });
+    setShowReviewForm(true);
+  };
+
+  const handleDeleteReview = async (reviewId) => {
+    if (!window.confirm('Are you sure you want to delete this review?')) {
+      return;
+    }
+
+    try {
+      await axiosPrivate.delete(`/review/deleteReview/${reviewId}`);
+      setFormSuccess('Review deleted successfully!');
+      
+      // Update reviews and recalculate average rating
+      const updatedReviews = reviews.filter(review => review.review_id !== reviewId);
+      setReviews(updatedReviews);
+      
+      // Recalculate average rating
+      if (updatedReviews.length > 0) {
+        const totalRating = updatedReviews.reduce((sum, review) => sum + review.stars, 0);
+        const avgRating = totalRating / updatedReviews.length;
+        setAverageRating(avgRating);
+      } else {
+        setAverageRating(0);
+      }
+      
+      // Refresh reviews from server to ensure consistency
+      fetchReviews(game.game_id);
+    } catch (err) {
+      setFormError('Failed to delete review. Please try again.');
+      console.error('Error deleting review:', err);
+    }
+  };
+
+  const handleReviewSubmit = async (e) => {
+    e.preventDefault();
+    setFormError(null);
+    setFormSuccess(null);
+
+    try {
+      if (editingReview) {
+        // Update existing review
+        await axiosPrivate.put(`/review/updateReview/${editingReview.review_id}`, {
+          game_id: game.game_id,
+          username: reviewForm.username,
+          stars: reviewForm.stars,
+          comment: reviewForm.comment
+        });
+        setFormSuccess('Review updated successfully!');
+      } else {
+        // Create new review
+        await axiosPrivate.post('/review/addReview', {
+          game_id: game.game_id,
+          username: reviewForm.username,
+          stars: reviewForm.stars,
+          comment: reviewForm.comment
+        });
+        setFormSuccess('Review submitted successfully!');
+      }
+
+      setReviewForm({
+        username: '',
+        stars: 5,
+        comment: ''
+      });
+      setShowReviewForm(false);
+      setEditingReview(null);
+
+      // Refresh reviews
+      fetchReviews(game.game_id);
+    } catch (err) {
+      if (err.response?.status === 404) {
+        setFormError(`User "${reviewForm.username}" does not exist. Please create an account first or check your username.`);
+      } else {
+        setFormError('Failed to submit review. Please try again.');
+      }
+      console.error('Error submitting review:', err);
+    }
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setReviewForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleCancelEdit = () => {
+    setEditingReview(null);
+    setReviewForm({
+      username: '',
+      stars: 5,
+      comment: ''
+    });
+    setShowReviewForm(false);
+  };
 
   if (loading) {
     return <div className="loading">Loading game details...</div>;
@@ -59,10 +217,13 @@ const GamePage = () => {
           </div>
           <div className="game-rating">
             <span className="stars">
-              {"★".repeat(Math.floor(parseFloat(game.popularity_score || 0)))}
+              {renderStars(averageRating)}
             </span>
             <span className="rating-number">
-              {parseFloat(game.popularity_score || 0).toFixed(1)}
+              {averageRating.toFixed(1)}
+            </span>
+            <span className="reviews-count">
+              ({reviews.length} {reviews.length === 1 ? 'review' : 'reviews'})
             </span>
           </div>
         </div>
@@ -86,10 +247,139 @@ const GamePage = () => {
               <p>{game.game_minplayers || '?'}-{game.game_maxplayers || '?'}</p>
             </div>
             <div className="detail-item">
-              <h3>Popularity Score</h3>
-              <p>{parseFloat(game.popularity_score || 0).toFixed(1)}</p>
+              <h3>Average Rating</h3>
+              <p>
+                <span className="stars">{renderStars(averageRating)}</span>
+                <span className="rating-number">{averageRating.toFixed(1)}</span>
+              </p>
             </div>
           </div>
+        </section>
+
+        <section className="reviews">
+          <div className="reviews-header">
+            <h2>Reviews</h2>
+            <button 
+              className="add-review-button"
+              onClick={() => {
+                setEditingReview(null);
+                setReviewForm({
+                  username: '',
+                  stars: 5,
+                  comment: ''
+                });
+                setShowReviewForm(!showReviewForm);
+              }}
+            >
+              {showReviewForm ? 'Cancel' : 'Write a Review'}
+            </button>
+          </div>
+
+          {showReviewForm && (
+            <div className="review-form-container">
+              <form onSubmit={handleReviewSubmit} className="review-form">
+                {formError && <div className="form-error">{formError}</div>}
+                {formSuccess && <div className="form-success">{formSuccess}</div>}
+                
+                <div className="form-group">
+                  <label htmlFor="username">Username</label>
+                  <input
+                    type="text"
+                    id="username"
+                    name="username"
+                    value={reviewForm.username}
+                    onChange={handleInputChange}
+                    required
+                    placeholder="Enter your username"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Rating</label>
+                  <div className="star-rating-input">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        className={`star-button ${star <= reviewForm.stars ? 'active' : ''}`}
+                        onClick={() => setReviewForm(prev => ({ ...prev, stars: star }))}
+                      >
+                        ★
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="comment">Review</label>
+                  <textarea
+                    id="comment"
+                    name="comment"
+                    value={reviewForm.comment}
+                    onChange={handleInputChange}
+                    required
+                    placeholder="Share your thoughts about the game..."
+                    rows="4"
+                  />
+                </div>
+
+                <div className="form-buttons">
+                  <button type="submit" className="submit-review-button">
+                    {editingReview ? 'Update Review' : 'Submit Review'}
+                  </button>
+                  {editingReview && (
+                    <button 
+                      type="button" 
+                      className="cancel-button"
+                      onClick={handleCancelEdit}
+                    >
+                      Cancel Edit
+                    </button>
+                  )}
+                </div>
+              </form>
+            </div>
+          )}
+
+          {reviewsLoading ? (
+            <div className="loading">Loading reviews...</div>
+          ) : reviewsError ? (
+            <div className="error">{reviewsError}</div>
+          ) : reviews.length === 0 ? (
+            <p className="no-reviews">No reviews yet. Be the first to review this game!</p>
+          ) : (
+            <div className="reviews-list">
+              {reviews.map((review) => (
+                <div key={review.review_id} className="review-card">
+                  <div className="review-header">
+                    <span className="reviewer">{review.username || 'Anonymous'}</span>
+                    <span className="review-date">
+                      {new Date(review.review_date).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <div className="review-rating">
+                    <span className="stars">{renderStars(review.stars)}</span>
+                    <span className="rating-number">{review.stars.toFixed(1)}</span>
+                  </div>
+                  <p className="review-comment">{review.comment}</p>
+                  <div className="review-actions">
+                    <button 
+                      className="edit-button"
+                      onClick={() => handleEditReview(review)}
+                    >
+                      Edit
+                    </button>
+                    <button 
+                      className="delete-button"
+                      onClick={() => handleDeleteReview(review.review_id)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       </div>
     </div>
