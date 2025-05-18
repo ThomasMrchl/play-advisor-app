@@ -22,16 +22,10 @@ const Footer = () => {
 
         <div className="footer-section">
           <h4>Connect With Us</h4>
-          <div className="social-links">
-            <a href="https://facebook.com" target="_blank" rel="noopener noreferrer">
-              <i className="fab fa-facebook"></i>
-            </a>
-            <a href="https://twitter.com" target="_blank" rel="noopener noreferrer">
-              <i className="fab fa-twitter"></i>
-            </a>
-            <a href="https://instagram.com" target="_blank" rel="noopener noreferrer">
-              <i className="fab fa-instagram"></i>
-            </a>
+          <div>
+            <p>Maxime TANG</p>
+            <p>Noah HEMONT</p>
+            <p>Thomas MARCHAL</p>
           </div>
         </div>
       </div>

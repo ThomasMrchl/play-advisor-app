@@ -1,154 +1,177 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { axiosPrivate } from '../api/axios';
 import '../styles/Leaderboard.css';
 
 const Leaderboard = () => {
   const navigate = useNavigate();
+  const [games, setGames] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Sample data for different leaderboard categories
-  const leaderboardData = {
-    topOfTheWeek: [
-      {
-        id: 1,
-        name: "Catan",
-        image: "https://images.unsplash.com/photo-1610890716171-6b1bb98ffd09?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=60",
-        rating: 4.8,
-        reviews: 1250,
-        category: "Strategy",
-        change: "+2"
-      },
-      {
-        id: 2,
-        name: "Ticket to Ride",
-        image: "https://images.unsplash.com/photo-1611996575749-79a3a250f948?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=60",
-        rating: 4.7,
-        reviews: 980,
-        category: "Family",
-        change: "+1"
-      },
-      {
-        id: 3,
-        name: "Pandemic",
-        image: "https://images.unsplash.com/photo-1611996575749-79a3a250f948?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=60",
-        rating: 4.6,
-        reviews: 850,
-        category: "Cooperative",
-        change: "-1"
+  useEffect(() => {
+    const fetchGames = async () => {
+      try {
+        const response = await axiosPrivate.get('/game/getGames');
+        const gamesData = response.data.result || response.data;
+        // Convertir les stars en nombre et trier les jeux
+        const sortedGames = Array.isArray(gamesData) ? gamesData
+          .map(game => ({
+            ...game,
+            stars: parseFloat(game.stars) || 0
+          }))
+          .sort((a, b) => b.stars - a.stars) : [gamesData];
+        setGames(sortedGames);
+        setLoading(false);
+      } catch (err) {
+        setError('Failed to fetch games');
+        setLoading(false);
+        console.error('Error fetching games:', err);
       }
-    ],
-    mostPopular: [
-      {
-        id: 4,
-        name: "Carcassonne",
-        image: "https://images.unsplash.com/photo-1610890716171-6b1bb98ffd09?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=60",
-        rating: 4.7,
-        reviews: 2100,
-        category: "Strategy",
-        change: "0"
-      },
-      {
-        id: 5,
-        name: "7 Wonders",
-        image: "https://images.unsplash.com/photo-1611996575749-79a3a250f948?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=60",
-        rating: 4.6,
-        reviews: 1800,
-        category: "Strategy",
-        change: "+1"
-      },
-      {
-        id: 6,
-        name: "Azul",
-        image: "https://images.unsplash.com/photo-1611996575749-79a3a250f948?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=60",
-        rating: 4.5,
-        reviews: 1500,
-        category: "Abstract",
-        change: "-1"
-      }
-    ],
-    highestRated: [
-      {
-        id: 7,
-        name: "Gloomhaven",
-        image: "https://images.unsplash.com/photo-1610890716171-6b1bb98ffd09?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=60",
-        rating: 4.9,
-        reviews: 950,
-        category: "RPG",
-        change: "0"
-      },
-      {
-        id: 8,
-        name: "Terraforming Mars",
-        image: "https://images.unsplash.com/photo-1611996575749-79a3a250f948?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=60",
-        rating: 4.8,
-        reviews: 1200,
-        category: "Strategy",
-        change: "+1"
-      },
-      {
-        id: 9,
-        name: "Wingspan",
-        image: "https://images.unsplash.com/photo-1611996575749-79a3a250f948?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=60",
-        rating: 4.7,
-        reviews: 1100,
-        category: "Strategy",
-        change: "-1"
-      }
-    ]
-  };
+    };
+
+    fetchGames();
+  }, []);
 
   const handleGameClick = (gameName) => {
     navigate(`/game/${gameName.toLowerCase().replace(/\s+/g, '-')}`);
   };
 
-  const renderLeaderboardSection = (title, games) => (
-    <section className="leaderboard-section">
-      <h2>{title}</h2>
-      <div className="leaderboard-grid">
-        {games.map((game, index) => (
+  const renderStars = (rating, reviewCount) => {
+    if (reviewCount === 0) {
+      return <span className="no-ratings">No ratings</span>;
+    }
+
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating % 1 >= 0.5;
+    const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
+
+    return (
+      <>
+        {"★".repeat(fullStars)}
+        {hasHalfStar && "★"}
+        {"☆".repeat(emptyStars)}
+      </>
+    );
+  };
+
+  const renderTopThree = () => {
+    const topThree = games.slice(0, 3);
+    return (
+      <div className="top-three-container">
+        {topThree.map((game, index) => (
           <div 
-            key={game.id}
-            className="leaderboard-card"
-            onClick={() => handleGameClick(game.name)}
+            key={game.game_id}
+            className={`top-three-card rank-${index + 1}`}
+            onClick={() => handleGameClick(game.game_name)}
             role="button"
             tabIndex={0}
             onKeyPress={(e) => {
               if (e.key === 'Enter') {
-                handleGameClick(game.name);
+                handleGameClick(game.game_name);
               }
             }}
           >
-            <div className="rank">{index + 1}</div>
+            <div className="rank-badge">{index + 1}</div>
             <div className="game-image">
-              <img src={game.image} alt={game.name} />
-              <span className="game-category">{game.category}</span>
+              <img 
+                src={game.image_url || 'https://via.placeholder.com/300'} 
+                alt={game.game_name} 
+              />
             </div>
             <div className="game-info">
-              <h3>{game.name}</h3>
+              <h3>{game.game_name}</h3>
               <div className="game-rating">
-                <span className="stars">{"★".repeat(Math.floor(game.rating))}</span>
-                <span className="rating-number">{game.rating}</span>
-                <span className="reviews">({game.reviews} reviews)</span>
+                {game.review_count === 0 ? (
+                  <span className="no-ratings">No ratings</span>
+                ) : (
+                  <>
+                    <span className="stars">{renderStars(game.stars, game.review_count)}</span>
+                    <span className="rating-number">{game.stars.toFixed(1)}</span>
+                  </>
+                )}
               </div>
-            </div>
-            <div className={`rank-change ${game.change.startsWith('+') ? 'positive' : game.change.startsWith('-') ? 'negative' : 'neutral'}`}>
-              {game.change}
+              <div className="game-meta">
+                <span className="game-year">{game.game_year || 'N/A'}</span>
+                <span className="game-players">
+                  {game.game_minplayers || '?'}-{game.game_maxplayers || '?'} players
+                </span>
+              </div>
             </div>
           </div>
         ))}
       </div>
-    </section>
-  );
+    );
+  };
+
+  const renderRestOfLeaderboard = () => {
+    const restOfGames = games.slice(3);
+    return (
+      <div className="rest-leaderboard">
+        {restOfGames.map((game, index) => (
+          <div 
+            key={game.game_id}
+            className="leaderboard-card"
+            onClick={() => handleGameClick(game.game_name)}
+            role="button"
+            tabIndex={0}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter') {
+                handleGameClick(game.game_name);
+              }
+            }}
+          >
+            <div className="rank">{index + 4}</div>
+            <div className="game-image">
+              <img 
+                src={game.image_url || 'https://via.placeholder.com/300'} 
+                alt={game.game_name} 
+              />
+            </div>
+            <div className="game-info">
+              <h3>{game.game_name}</h3>
+              <div className="game-rating">
+                {game.review_count === 0 ? (
+                  <span className="no-ratings">No ratings</span>
+                ) : (
+                  <>
+                    <span className="stars">{renderStars(game.stars, game.review_count)}</span>
+                    <span className="rating-number">{game.stars.toFixed(1)}</span>
+                  </>
+                )}
+              </div>
+              <div className="game-meta">
+                <span className="game-year">{game.game_year || 'N/A'}</span>
+                <span className="game-players">
+                  {game.game_minplayers || '?'}-{game.game_maxplayers || '?'} players
+                </span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  if (loading) {
+    return <div className="loading">Loading leaderboard...</div>;
+  }
+
+  if (error) {
+    return <div className="error">{error}</div>;
+  }
 
   return (
     <div className="leaderboard-page">
       <div className="leaderboard-header">
-        <h1>Leaderboard</h1>
-        <p>Discover the most popular and highest-rated board games</p>
+        <h1>Game Rankings</h1>
+        <p>Discover the highest-rated board games in our collection</p>
       </div>
 
-      {renderLeaderboardSection("Top of the Week", leaderboardData.topOfTheWeek)}
-      {renderLeaderboardSection("Most Popular", leaderboardData.mostPopular)}
-      {renderLeaderboardSection("Highest Rated", leaderboardData.highestRated)}
+      <div className="leaderboard-content">
+        {renderTopThree()}
+        {renderRestOfLeaderboard()}
+      </div>
     </div>
   );
 };

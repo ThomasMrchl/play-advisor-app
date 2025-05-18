@@ -113,14 +113,14 @@ const Home = () => {
                   </div>
                 </div>
                 <div className="game-rating">
-                  {game?.popularity_score && game?.review_count > 0 ? (
+                  {game?.stars && game?.review_count > 0 ? (
                     <>
                       <span className="stars">
-                        {console.log('Average rating:', game.popularity_score)}
-                        {renderStars(game.popularity_score)}
+                        {console.log('Average rating:', game.stars)}
+                        {renderStars(game.stars)}
                       </span>
                       <span className="rating-number">
-                        {parseFloat(game.popularity_score).toFixed(1)}
+                        {parseFloat(game.stars).toFixed(1)}
                       </span>
                       <span className="review-count">
                         ({game.review_count} {game.review_count === 1 ? 'rating' : 'ratings'})
