@@ -24,7 +24,7 @@ const Footer = () => {
           <h4>Connect With Us</h4>
           <div>
             <p>Maxime TANG</p>
-            <p>Noah HEMONT</p>
+            <p>Noah HEMON</p>
             <p>Thomas MARCHAL</p>
           </div>
         </div>
